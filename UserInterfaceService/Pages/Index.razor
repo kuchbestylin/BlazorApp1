@@ -1,0 +1,76 @@
+﻿@page "/"
+@using System.Globalization;
+@inject NotificationService NotificationService
+
+<PageTitle>Index</PageTitle>
+
+
+<div class="d-flex flex-column gap-2 align-items-start">
+    <div class="" style="border: 1px dashed silver;">
+        <InputFile @key="guid" id="@guid" OnChange="FileChanged" style="height: 10em; width: 100%">
+
+        </InputFile>
+    </div>
+    <RadzenButton Click="@ButtonClicked" Text="Upload"></RadzenButton>
+</div>
+@code {
+    Guid guid = new Guid();
+    void ButtonClicked()
+    {
+
+    }
+
+    async Task FileChanged(InputFileChangeEventArgs e)
+    {
+        if (!e.File.Name.EndsWith(".csv"))
+        {
+            guid = Guid.NewGuid();
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error:", Detail = "only .csv files are supported", Duration = 6000 });
+            return;
+        }
+        var filePath = await SaveFile(e.File);
+
+        WorkBook workBook = WorkBook.LoadCSV(filePath, fileFormat: ExcelFileFormat.XLSX, listDelimiter: ",");
+        WorkSheet cells = workBook.DefaultWorkSheet;
+        Console.WriteLine(cells.GetRow(0).Count);
+    }
+
+    private async Task<string> SaveFile(IBrowserFile file)
+    {
+        var filePath = Path.Combine("FileUploads", file.Name);
+
+        if (!Directory.Exists("FileUploads"))
+            Directory.CreateDirectory("FileUploads");
+
+        if (File.Exists(filePath))
+        {
+            var newFilePath = GetUniqueFilePath(filePath); // Get a new unique file path
+            File.Move(filePath, newFilePath); // Rename the existing file
+        }
+
+        try
+        {
+            using (var stream = new FileStream(filePath, FileMode.Create))
+                await file.OpenReadStream().CopyToAsync(stream);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+            throw;
+        }
+        guid = Guid.NewGuid();
+        StateHasChanged();
+        NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Success:", Detail = "File Uploaded", Duration = 6000 });
+        return filePath;
+    }
+
+    private string GetUniqueFilePath(string filePath)
+    {
+        var directory = Path.GetDirectoryName(filePath);
+        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+        var extension = Path.GetExtension(filePath);
+
+        var uniqueFileName = $"{fileNameWithoutExtension}_{DateTime.Now.Day}{DateTime.Now.DayOfWeek}{DateTime.Now.Year}{DateTime.Now.Ticks}{extension}";
+        return Path.Combine(directory, uniqueFileName);
+    }
+}
