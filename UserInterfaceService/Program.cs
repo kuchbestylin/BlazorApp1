@@ -1,7 +1,11 @@
+using Grpc.Net.Client;
+using Grpc.Net.Client.Web;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Radzen;
 using UserInterfaceService.Data;
+using UserInterfaceService.Services;
+using static UserInterfaceService.FileService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +13,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<WeatherForecastService>();
+builder.Services.AddSingleton(services =>
+{
+    var httpClient = new HttpClient(new GrpcWebHandler(GrpcWebMode.GrpcWeb,
+      new HttpClientHandler()));
+    var channel = GrpcChannel.ForAddress("http://localhost:9090",
+      new GrpcChannelOptions { HttpClient = httpClient });
+    return new FileServiceClient(channel);
+});
+builder.Services.AddSingleton<FileOpsService>();
 
 // Adding Services for Radzen
 builder.Services.AddScoped<DialogService>();

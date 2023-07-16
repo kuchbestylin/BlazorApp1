@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option csharp_namespace = "WorkBookExtractionService";
+
+service FileService {
+    rpc UploadCsv(CsvFile) returns (UploadResponse);
+}
+
+message UploadResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message CsvFile {
+    bytes content = 1;
+    string filePath = 2;
+}

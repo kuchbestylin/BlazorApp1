@@ -1,0 +1,17 @@
+syntax = "proto3";
+import "google/protobuf/wrappers.proto";
+option csharp_namespace = "UserInterfaceService";
+
+service FileService {
+    rpc UploadCsv(CsvFile) returns (UploadResponse);
+}
+
+message UploadResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message CsvFile {
+    google.protobuf.BytesValue content = 1;
+    string fileName = 2;
+}

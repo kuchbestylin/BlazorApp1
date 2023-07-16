@@ -1,6 +1,6 @@
 ﻿@page "/"
 @using System.Globalization;
-@inject NotificationService NotificationService
+@inject NotificationService NotificationService;
 
 <PageTitle>Index</PageTitle>
 
@@ -14,25 +14,77 @@
     <RadzenButton Click="@ButtonClicked" Text="Upload"></RadzenButton>
 </div>
 @code {
+
     Guid guid = new Guid();
     void ButtonClicked()
     {
 
     }
 
+    public static Google.Protobuf.ByteString ConvertToByteString(IBrowserFile file)
+    {
+        using (var memoryStream = new MemoryStream())
+        {
+            file.OpenReadStream().CopyTo(memoryStream);
+            Console.WriteLine(memoryStream);
+            return Google.Protobuf.ByteString.CopyFrom(memoryStream.ToArray());
+        }
+    }
+
     async Task FileChanged(InputFileChangeEventArgs e)
     {
-        if (!e.File.Name.EndsWith(".csv"))
+        using var memoryStream = new MemoryStream();
+        Console.WriteLine("ReadStreamOpen");
+        await e.File.OpenReadStream().CopyToAsync(memoryStream);
+        Console.WriteLine("Copied To ReadStream");
+        CsvFile csvFile = new CsvFile()
         {
-            guid = Guid.NewGuid();
-            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error:", Detail = "only .csv files are supported", Duration = 6000 });
-            return;
+            FileName = e.File.Name,
+            Content = Google.Protobuf.ByteString.CopyFrom(memoryStream.ToArray())
+        };
+        Console.WriteLine(csvFile);
+        Console.WriteLine();
+        using var channel = GrpcChannel.ForAddress("http://localhost:5171");
+        var client = new FileService.FileServiceClient(channel);
+        try
+        {
+            Console.WriteLine("Calling\n\n");
+            var reply = await client.UploadCsvAsync(csvFile);
+            Console.WriteLine(reply.Success);
+            Console.WriteLine(reply.Message);
         }
-        var filePath = await SaveFile(e.File);
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        // if (!e.File.Name.EndsWith(".csv"))
+        // {
+        //     guid = Guid.NewGuid();
+        //     NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error:", Detail = "only .csv files are supported", Duration = 6000 });
+        //     return;
+        // }
+        // var filePath = await SaveFile(e.File);
 
-        WorkBook workBook = WorkBook.LoadCSV(filePath, fileFormat: ExcelFileFormat.XLSX, listDelimiter: ",");
-        WorkSheet cells = workBook.DefaultWorkSheet;
-        Console.WriteLine(cells.GetRow(0).Count);
+        // CsvFile csvFile = new CsvFile()
+        //     {
+        //     };
+        // try
+        // {
+        //     var response = await client.UploadCsvAsync(csvFile);
+        //     Console.WriteLine("Grpc Status " + response.Success);
+        //     Console.WriteLine("Grpc Result " + response.Message);
+        // }
+        // catch(Exception ex)
+        // {
+        //     Console.WriteLine("Error:" + ex.Message);
+        //     Console.WriteLine("Error:" + ex.HelpLink);
+        //     Console.WriteLine("Error:" + ex.Source);
+        //     Console.WriteLine("Error:" + ex.Data);
+        //     Console.WriteLine("Error:" + ex.StackTrace);
+        // }
+        // WorkBook workBook = WorkBook.LoadCSV(filePath, fileFormat: ExcelFileFormat.XLSX, listDelimiter: ",");
+        // WorkSheet cells = workBook.DefaultWorkSheet;
+        // Console.WriteLine(cells.GetRow(0).Count);
     }
 
     private async Task<string> SaveFile(IBrowserFile file)
